@@ -1,0 +1,6 @@
+[package]
+name = "libpassvault"
+version = "0.1.0"
+authors = ["Viktor Sævarsson <viktor.saevars@gmail.com>"]
+
+[dependencies]
