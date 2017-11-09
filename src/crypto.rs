@@ -5,7 +5,7 @@ use ring::rand::SecureRandom;
 
 static DIGEST_ALG: &'static digest::Algorithm = &digest::SHA256;
 static ENCRYPTION_ALG: &'static aead::Algorithm = &aead::CHACHA20_POLY1305;
-const ITERATIONS: u32 = 1000;
+const ITERATIONS: u32 = 50000;
 const KEY_BYTES: usize = 32;
 const NONCE_BYTES: usize = 12;
 const SALT_BYTES: usize = 8;
@@ -116,7 +116,8 @@ pub fn decrypt(bytes: Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
 
     let opening_key = aead::OpeningKey::new(ENCRYPTION_ALG, &key).unwrap();
 
-    let decrypted = aead::open_in_place(&opening_key, &nonce, &additional_data, 0, &mut data).unwrap();
+    let decrypted = aead::open_in_place(&opening_key, &nonce, &additional_data, 0, &mut data)
+        .unwrap();
     Ok(decrypted.to_vec())
 }
 
