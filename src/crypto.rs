@@ -10,11 +10,11 @@ const KEY_BYTES: usize = 32;
 const NONCE_BYTES: usize = 12;
 const SALT_BYTES: usize = 8;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Key([u8; KEY_BYTES]);
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Nonce([u8; NONCE_BYTES]);
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub struct Salt([u8; SALT_BYTES]);
 
 /// Generates a random key

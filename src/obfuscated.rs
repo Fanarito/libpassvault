@@ -1,5 +1,8 @@
+use std::fmt;
+
 use crypto::{Key, Nonce, encrypt_gen_key, decrypt_with_key_nonce};
 
+#[derive(Serialize, Deserialize)]
 pub struct ObfuscatedString {
     key: Key,
     nonce: Nonce,
@@ -20,6 +23,18 @@ impl ObfuscatedString {
     pub fn get_text(&self) -> String {
         let decrypted = decrypt_with_key_nonce(&self.string, &self.key, &self.nonce).unwrap();
         String::from_utf8(decrypted).unwrap()
+    }
+}
+
+impl fmt::Debug for ObfuscatedString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "***secret***")
+    }
+}
+
+impl fmt::Display for ObfuscatedString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "***secret***")
     }
 }
 

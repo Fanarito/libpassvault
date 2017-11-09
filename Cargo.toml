@@ -5,3 +5,6 @@ authors = ["Viktor Sævarsson <viktor.saevars@gmail.com>"]
 
 [dependencies]
 ring = "0.12.1"
+serde = "1.0.18"
+serde_json = "1.0.5"
+serde_derive = "1.0.18"
