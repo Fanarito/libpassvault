@@ -10,37 +10,44 @@ const KEY_BYTES: usize = 32;
 const NONCE_BYTES: usize = 12;
 const SALT_BYTES: usize = 8;
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Key([u8; KEY_BYTES]);
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Nonce([u8; NONCE_BYTES]);
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct Salt([u8; SALT_BYTES]);
+
 /// Generates a random key
-fn gen_key() -> [u8; KEY_BYTES] {
+pub fn gen_key() -> Key {
     let rand = rand::SystemRandom::new();
     let mut key = [0; KEY_BYTES];
     rand.fill(&mut key).unwrap();
-    key
+    Key(key)
 }
 
 /// Generates a random nonce
-fn gen_nonce() -> [u8; NONCE_BYTES] {
+pub fn gen_nonce() -> Nonce {
     let rand = rand::SystemRandom::new();
     let mut nonce = [0; NONCE_BYTES];
     rand.fill(&mut nonce).unwrap();
-    nonce
+    Nonce(nonce)
 }
 
 /// Generates a random salt
-fn gen_salt() -> [u8; SALT_BYTES] {
+pub fn gen_salt() -> Salt {
     let rand = rand::SystemRandom::new();
     let mut salt = [0; SALT_BYTES];
     rand.fill(&mut salt).unwrap();
-    salt
+    Salt(salt)
 }
 
 /// Derives a key from a string and salt.
 /// If it is passed the same string and salt it will return the same key
-fn derive_key(pw: &str, salt: [u8; SALT_BYTES]) -> [u8; KEY_BYTES] {
+pub fn derive_key(pw: &str, salt: Salt) -> Key {
     let pw_bytes = pw.as_bytes();
     let mut key = [0; 32];
-    pbkdf2::derive(DIGEST_ALG, ITERATIONS, &salt, pw_bytes, &mut key);
-    key
+    pbkdf2::derive(DIGEST_ALG, ITERATIONS, &salt.0, pw_bytes, &mut key);
+    Key(key)
 }
 
 /// Adds the needed suffix space for the tag
@@ -56,13 +63,13 @@ fn add_suffix_space(bytes: &mut Vec<u8>) {
 ///
 /// * `bytes` - Bytes to encrypt
 /// * `pw` - The string to derive the key from
-pub fn encrypt(bytes: Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
+pub fn encrypt(bytes: &Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
     let mut data = bytes.clone();
 
     let salt = gen_salt();
     let nonce = gen_nonce();
     let key = derive_key(pw, salt);
-    let sealing_key = aead::SealingKey::new(ENCRYPTION_ALG, &key).unwrap();
+    let sealing_key = aead::SealingKey::new(ENCRYPTION_ALG, &key.0).unwrap();
 
     let additional_data: [u8; 0] = [];
 
@@ -70,7 +77,7 @@ pub fn encrypt(bytes: Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
 
     match aead::seal_in_place(
         &sealing_key,
-        &nonce,
+        &nonce.0,
         &additional_data,
         &mut data,
         aead::MAX_TAG_LEN,
@@ -80,10 +87,38 @@ pub fn encrypt(bytes: Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
     }
 
     // Append salt and nonce to the encrypted data to allow decryption
-    data.extend(salt.to_vec());
-    data.extend(nonce.to_vec());
+    data.extend(salt.0.to_vec());
+    data.extend(nonce.0.to_vec());
 
     Ok(data)
+}
+
+/// Encrypts `bytes` with a generated key
+///
+/// # Arguments
+///
+/// * `bytes` - Bytes to encrypt
+pub fn encrypt_gen_key(bytes: &Vec<u8>) -> Result<(Key, Nonce, Vec<u8>), &'static str> {
+    let mut data = bytes.clone();
+
+    let key = gen_key();
+    let nonce = gen_nonce();
+    let sealing_key = aead::SealingKey::new(ENCRYPTION_ALG, &key.0).unwrap();
+
+    let additional_data: [u8; 0] = [];
+
+    add_suffix_space(&mut data);
+
+    match aead::seal_in_place(
+        &sealing_key,
+        &nonce.0,
+        &additional_data,
+        &mut data,
+        aead::MAX_TAG_LEN,
+    ) {
+        Ok(_) => Ok((key, nonce, data)),
+        Err(_) => return Err("Could not encrypt data"),
+    }
 }
 
 // https://stackoverflow.com/a/37679442/3501438
@@ -101,25 +136,41 @@ where
 ///
 /// * `bytes` - Bytes to decrypt
 /// * `pw` - The string to derive the key from
-pub fn decrypt(bytes: Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
+pub fn decrypt(bytes: &Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
     let mut data = bytes.clone();
     // Extract salt and nonce from bytes
     let added_data_start = data.len() - (SALT_BYTES + NONCE_BYTES);
     let salt_nonce = data.split_off(added_data_start);
-    let salt: [u8; SALT_BYTES] = clone_into_array(&salt_nonce[0..SALT_BYTES]);
-    let nonce: [u8; NONCE_BYTES] =
-        clone_into_array(&salt_nonce[SALT_BYTES..SALT_BYTES + NONCE_BYTES]);
+    let salt = Salt(clone_into_array(&salt_nonce[0..SALT_BYTES]));
+    let nonce = Nonce(clone_into_array(
+        &salt_nonce[SALT_BYTES..SALT_BYTES + NONCE_BYTES],
+    ));
 
     let additional_data: [u8; 0] = [];
 
     let key = derive_key(pw, salt);
 
-    let opening_key = aead::OpeningKey::new(ENCRYPTION_ALG, &key).unwrap();
+    let opening_key = aead::OpeningKey::new(ENCRYPTION_ALG, &key.0).unwrap();
 
-    let decrypted = aead::open_in_place(&opening_key, &nonce, &additional_data, 0, &mut data)
+    let decrypted = aead::open_in_place(&opening_key, &nonce.0, &additional_data, 0, &mut data)
         .unwrap();
     Ok(decrypted.to_vec())
 }
+
+/// Decrypts `bytes` with the provided `key` and `nonce`
+pub fn decrypt_with_key_nonce(
+    bytes: &Vec<u8>,
+    key: &Key,
+    nonce: &Nonce,
+) -> Result<Vec<u8>, &'static str> {
+    let mut data = bytes.clone();
+    let additional_data: [u8; 0] = [];
+    let opening_key = aead::OpeningKey::new(ENCRYPTION_ALG, &key.0).unwrap();
+    let decrypted = aead::open_in_place(&opening_key, &nonce.0, &additional_data, 0, &mut data)
+        .unwrap();
+    Ok(decrypted.to_vec())
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -128,19 +179,19 @@ mod tests {
     #[test]
     fn gen_key_returns_correct_size_keys() {
         let key = gen_key();
-        assert_eq!(key.len(), KEY_BYTES);
+        assert_eq!(key.0.len(), KEY_BYTES);
     }
 
     #[test]
     fn gen_nonce_returns_correct_size_once() {
         let nonce = gen_nonce();
-        assert_eq!(nonce.len(), NONCE_BYTES);
+        assert_eq!(nonce.0.len(), NONCE_BYTES);
     }
 
     #[test]
     fn gen_salt_returns_correct_size_salt() {
         let salt = gen_salt();
-        assert_eq!(salt.len(), SALT_BYTES);
+        assert_eq!(salt.0.len(), SALT_BYTES);
     }
 
     #[test]
@@ -148,7 +199,7 @@ mod tests {
         let pw = "password1";
         let salt = gen_salt();
         let key = derive_key(pw, salt);
-        assert_eq!(key.len(), KEY_BYTES);
+        assert_eq!(key.0.len(), KEY_BYTES);
     }
 
     #[test]
@@ -194,12 +245,12 @@ mod tests {
         let data = "test data";
         let pw = "password";
         let bytes = data.as_bytes().to_vec();
-        let encrypted = encrypt(bytes, pw).unwrap();
+        let encrypted = encrypt(&bytes, pw).unwrap();
         match String::from_utf8(encrypted.clone()) {
             Ok(_) => panic!("encryption not encrypting"),
             Err(_) => {}
         }
-        let decrypted = decrypt(encrypted, pw).unwrap();
+        let decrypted = decrypt(&encrypted, pw).unwrap();
         match String::from_utf8(decrypted) {
             Ok(s) => assert_eq!(s, data),
             Err(_) => panic!("decryption not yielding correct data"),
