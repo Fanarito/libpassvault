@@ -153,7 +153,7 @@ pub fn decrypt(bytes: &Vec<u8>, pw: &str) -> Result<Vec<u8>, &'static str> {
     let opening_key = aead::OpeningKey::new(ENCRYPTION_ALG, &key.0).unwrap();
 
     let decrypted = aead::open_in_place(&opening_key, &nonce.0, &additional_data, 0, &mut data)
-        .unwrap();
+        .expect("could not decrypt");
     Ok(decrypted.to_vec())
 }
 

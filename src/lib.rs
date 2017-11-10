@@ -7,3 +7,4 @@ extern crate serde_derive;
 pub mod crypto;
 pub mod obfuscated;
 pub mod database;
+pub mod connection;
