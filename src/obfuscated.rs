@@ -2,7 +2,7 @@ use std::fmt;
 
 use crypto::{Key, Nonce, encrypt_gen_key, decrypt_with_key_nonce};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct ObfuscatedString {
     key: Key,
     nonce: Nonce,
@@ -10,7 +10,7 @@ pub struct ObfuscatedString {
 }
 
 impl ObfuscatedString {
-    pub fn new(plaintext: String) -> ObfuscatedString {
+    pub fn new(plaintext: &str) -> ObfuscatedString {
         let bytes = plaintext.as_bytes().to_vec();
         let (key, nonce, encrypted) = encrypt_gen_key(&bytes).unwrap();
         ObfuscatedString {
@@ -41,13 +41,12 @@ impl fmt::Display for ObfuscatedString {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
     use obfuscated::*;
 
     #[test]
     fn get_text_returns_correct_text() {
-        let text = String::from_str("testing text").unwrap();
-        let ostring = ObfuscatedString::new(text.clone());
+        let text = "testing text";
+        let ostring = ObfuscatedString::new(text);
         assert_eq!(text, ostring.get_text());
     }
 }
